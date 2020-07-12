@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\TinyEventBus\SimpleLog.csproj" />
+    <ProjectReference Include="..\..\src\SimpleLog\SimpleLog.csproj" />
   </ItemGroup>
 
 </Project>
