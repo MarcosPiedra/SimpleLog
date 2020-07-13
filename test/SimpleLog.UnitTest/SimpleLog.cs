@@ -5,98 +5,40 @@ using System.Linq;
 using Moq;
 using System.Collections.Generic;
 using System.Threading;
+using SimpleLog.Abstractions;
+using System.Reflection.Metadata;
+using Microsoft.Extensions.Logging;
+using sl = SimpleLog;
+using System.Threading.Tasks;
+using System.Text;
 
 namespace TinyEventBus.UnitTest
 {
     public class SimpleLog
     {
-        [Theory]
-        [InlineData(1)]
-        [InlineData(2)]
-        [InlineData(10)]
-        public void Should_Be_A_Number_Queue_Correct(int num)
-        {
-            //var manager = new InMemorySubscriptionsManager() as ISubscriptionsManager;
-            //var queues = new List<string>();
-
-            //for (int i = 0; i < num; i++)
-            //{
-            //    queues.Add($"q{i}");
-            //    SetAllEventHandlers(manager, i);
-            //}
-
-            //Assert.Equal(queues.AsEnumerable(), manager.GetConsumersQueues());
-        }
-
         [Fact]
-        public void Should_Remove_And_Throw_Of_Events()
+        public void Should_Call_All_Methods_In_Appender()
         {
-            //DoActionAndCheckEventsAndQueue(m => SetAllEventHandlers(m, 1),
-            //                               m => m.RemoveConsumer(NewE<EventA>()));
+            var stub = new Mock<IAppender>();
+            var wasInitiated = false;
+            var wasEnded = false;
 
-            //DoActionAndCheckEventsAndQueue(m => SetAllEventHandlers(m, 1),
-            //                               m => m.RemoveConsumer(NewE<EventB>()));
+            var wordToWrite = "oh yeah!";
+            var sb = new StringBuilder();
 
-            //DoActionAndCheckEventsAndQueue(m => SetAllEventHandlers(m, 1),
-            //                               m =>
-            //                               {
-            //                                   m.RemoveConsumer(NewE<EventA>(), NewEH<EventHandlerA>());
-            //                                   m.RemoveConsumer(NewE<EventB>(), NewEH<EventHandlerB>());
-            //                               });
+            stub.Setup(a => a.InitAsync()).Callback(() => { wasInitiated = true; });
+            stub.Setup(a => a.CloseAsync()).Callback(() => wasEnded = true);
+            stub.Setup(a => a.WriteAsync(It.IsAny<string>())).Callback<string>((m) => sb.AppendLine(m)).Returns(Task.CompletedTask);
+
+            var log = new sl.Logger<SimpleLog>("X".Select(s => stub.Object).AsEnumerable());
+
+            log.InitAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+            log.Write(wordToWrite, Level.Debug);
+            log.CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+
+            Assert.True(wasInitiated);
+            Assert.True(wasEnded);
+            Assert.Contains(wordToWrite, sb.ToString());
         }
-
-        [Fact]
-        public void Should_Remove_And_Throw_Events_And_Queue()
-        {
-            //DoActionAndCheckEventsAndQueue(m =>
-            //                               {
-            //                                   SetAllEventHandlers(m, 1);
-            //                                   SetEventHandlersA(m, 1);
-            //                                   SetEventHandlersB(m, 2);
-            //                               },
-            //                               m =>
-            //                               {
-            //                                   m.RemoveConsumer("q1", NewE<EventA>());
-            //                               });
-
-            //DoActionAndCheckQueue(m =>
-            //                      {
-            //                          SetAllEventHandlers(m, 1);
-            //                          SetEventHandlersA(m, 1);
-            //                          SetEventHandlersB(m, 2);
-            //                      },
-            //                      m =>
-            //                      {
-            //                          m.RemoveConsumer("q1");
-            //                      });
-        }
-
-        [Fact]
-        public void Should_Be_Events_And_Handler_Registered()
-        {
-            //var manager = new InMemorySubscriptionsManager() as ISubscriptionsManager;
-            //var managerComparer = new Mock<ISubscriptionsManager>();
-            //var eventsAinQ1 = 0;
-
-            //managerComparer.Setup(m => m.AddOrUpdateConsumer(It.IsIn("q1"), It.IsIn(NewE<EventA>()), It.IsAny<EventHandlerType>()))
-            //               .Callback<string, EventType, EventHandlerType>((a, b, c) => eventsAinQ1++);
-
-            //SetEventHandlersA(manager, 1);
-            //SetEventHandlersA(managerComparer.Object, 1);
-            //SetEventHandlersA(manager, 2);
-            //SetEventHandlersA(managerComparer.Object, 2);
-            //SetEventHandlersB(manager, 2);
-            //SetEventHandlersB(managerComparer.Object, 2);
-
-            //var x = manager.GetConsumersEvents("q1", "x");
-            //Assert.Empty(x);
-
-            //x = manager.GetConsumersEvents("q1", nameof(EventA));
-            //Assert.Equal(2, eventsAinQ1);
-
-            //var y = manager.GetConsumersEvents("q1");
-            //Assert.Single(y);
-        }
-
     }
 }

@@ -17,7 +17,7 @@ namespace SimpleLog
 
         Task _loggerTask;
         ManualResetEventSlim _msgAdded = new ManualResetEventSlim(false);
-        BlockingCollection<Task> _appendersTasks = new BlockingCollection<Task>();
+        ConcurrentQueue<Task> _appendersTasks = new ConcurrentQueue<Task>();
         CancellationTokenSource _tokenSource = new CancellationTokenSource();
 
         public Logger(IEnumerable<IAppender> appenders)
@@ -28,16 +28,20 @@ namespace SimpleLog
             if (_appenders.Count() == 0)
                 return;
 
-            _loggerTask = Task.Run(() =>
+            _loggerTask = Task.Run(async () =>
             {
                 while (!_tokenSource.IsCancellationRequested)
                 {
                     _msgAdded.WaitHandle.WaitOne();
                     _msgAdded.Reset();
 
-                    _appendersTasks.GetConsumingEnumerable()
-                                   .Select(async t => await t)
-                                   .ToArray();
+                    var taskList = new List<Task>();
+                    while (_appendersTasks.Count > 0)
+                    {
+                        _appendersTasks.TryDequeue(out Task task);
+                        taskList.Add(task);
+                    }
+                    await Task.WhenAll(taskList.ToArray());
                 }
             });
         }
@@ -79,9 +83,8 @@ namespace SimpleLog
         {
             foreach (var listener in _appenders)
             {
-                _appendersTasks.Add(listener.WriteAsync(message));
+                _appendersTasks.Enqueue(listener.WriteAsync(message));
             }
-
             _msgAdded.Set();
         }
 
@@ -96,9 +99,8 @@ namespace SimpleLog
         public async Task CloseAsync()
         {
             Write("/*************** Log Finished ***************/", Level.Info);
-            _msgAdded.Set();
             _tokenSource.Cancel();
-            await _loggerTask;
+            await Task.WhenAll(new Task[] { _loggerTask });
             await Task.WhenAll(_appenders.Select(async l => await l.CloseAsync()));
         }
     }
